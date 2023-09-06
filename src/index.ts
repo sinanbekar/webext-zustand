@@ -8,7 +8,7 @@ export const wrapStore = <T>(store: StoreApi<T>) => {
   const serializer = (payload: unknown) => JSON.stringify(payload);
   const deserializer = (payload: string) => JSON.parse(payload);
 
-  if (!self.window) {
+  if (isBackground()) {
     // background
     handleBackground(store, {
       serializer,
@@ -69,6 +69,33 @@ const handlePages = <T>(
       unsubscribe = store.subscribe(callback);
     });
   });
+};
+
+const isBackground = () => {
+  const isCurrentPathname = (path?: string | null) =>
+    path
+      ? new URL(path, location.origin).pathname === location.pathname
+      : false;
+
+  const manifest = chrome.runtime.getManifest();
+
+  return (
+    !self.window ||
+    (chrome.extension.getBackgroundPage &&
+      typeof window !== "undefined" &&
+      chrome.extension.getBackgroundPage() === window) ||
+    (manifest &&
+      (isCurrentPathname(manifest.background_page) ||
+        (manifest.background &&
+          "page" in manifest.background &&
+          isCurrentPathname(manifest.background.page)) ||
+        Boolean(
+          manifest.background &&
+            "scripts" in manifest.background &&
+            manifest.background.scripts &&
+            isCurrentPathname("/_generated_background_page.html")
+        )))
+  );
 };
 
 const DISPATCH_TYPE = "STATE_CHANGE";
