@@ -17,6 +17,8 @@ npm install webext-zustand
 
 That's it! Now your store is available from everywhere.
 
+> You can try out the basic example app in the `examples` folder.
+
 `store.ts`
 
 ```js
