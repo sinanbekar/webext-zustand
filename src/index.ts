@@ -5,12 +5,13 @@ import {
 import type { StoreApi } from "zustand";
 
 export const wrapStore = async <T>(store: StoreApi<T>) => {
+  const portName = PORTNAME_PREFIX + getStoreId(store);
   const serializer = (payload: unknown) => JSON.stringify(payload);
   const deserializer = (payload: string) => JSON.parse(payload);
 
   if (isBackground()) {
-    // background
     handleBackground(store, {
+      portName,
       serializer,
       deserializer,
     });
@@ -18,49 +19,58 @@ export const wrapStore = async <T>(store: StoreApi<T>) => {
     return;
   } else {
     return handlePages(store, {
+      portName,
       serializer,
       deserializer,
     });
   }
 };
 
-type ReduxConfiguration = Parameters<typeof reduxWrapStore>[1];
-
 const handleBackground = <T>(
   store: StoreApi<T>,
-  _configuration?: ReduxConfiguration
+  configuration?: BackgroundConfiguration
 ) => {
-  reduxWrapStore({
-    getState: store.getState,
-    subscribe: store.subscribe,
-    //@ts-ignore
-    dispatch(action) {
-      if (action.type === DISPATCH_TYPE) {
-        store.setState(action.payload);
-      }
+  reduxWrapStore(
+    {
+      getState: store.getState,
+      subscribe: store.subscribe,
+      //@ts-ignore
+      dispatch(data: { _sender: chrome.runtime.MessageSender; state: T }) {
+        store.setState(data.state);
+
+        return { payload: data.state };
+      },
     },
-  });
+    configuration
+  );
 };
 
 const handlePages = async <T>(
   store: StoreApi<T>,
-  _configuration?: ReduxConfiguration
+  configuration?: PagesConfiguration
 ) => {
-  const { serializer, deserializer, ...configuration } = _configuration || {};
   const proxyStore = new Store(configuration);
-
+  // wait to be ready
   await proxyStore.ready();
-
-  // initial
+  // initial state
   store.setState(proxyStore.getState());
 
-  const callback = (state: T) => {
-    state = deserializer?.(serializer?.(state)) ?? state;
-
-    // to prevent infinite loop, setting state directly
-    //@ts-ignore
-    proxyStore.state = state;
-    proxyStore.dispatch({ type: DISPATCH_TYPE, payload: state });
+  const callback = (state: T, oldState: T) => {
+    (proxyStore.dispatch({ state }) as unknown as Promise<T>).then(
+      (syncedState) => {
+        if (syncedState) {
+          // success
+        } else {
+          // error (edge case)
+          // prevent infinite loop
+          unsubscribe();
+          // revert
+          store.setState(oldState);
+          // resub
+          unsubscribe = store.subscribe(callback);
+        }
+      }
+    );
   };
 
   let unsubscribe = store.subscribe(callback);
@@ -68,7 +78,9 @@ const handlePages = async <T>(
   proxyStore.subscribe(() => {
     // prevent retrigger
     unsubscribe();
+    // update
     store.setState(proxyStore.getState());
+    // resub
     unsubscribe = store.subscribe(callback);
   });
 };
@@ -100,4 +112,20 @@ const isBackground = () => {
   );
 };
 
-const DISPATCH_TYPE = "STATE_CHANGE";
+type BackgroundConfiguration = Parameters<typeof reduxWrapStore>[1];
+type PagesConfiguration = ConstructorParameters<typeof Store>[0];
+
+const getStoreId = (() => {
+  let id = 0;
+  const map = new WeakMap();
+
+  return <T>(store: StoreApi<T>): number => {
+    if (!map.has(store)) {
+      map.set(store, ++id);
+    }
+
+    return map.get(store);
+  };
+})();
+
+const PORTNAME_PREFIX = `webext-zustand-`;
