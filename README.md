@@ -112,7 +112,10 @@ const Content = () => {
 };
 
 storeReadyPromise.then(() => {
-  createRoot(document.body).render(
+  const root = document.createElement("div");
+  document.body.prepend(root);
+
+  createRoot(root).render(
     <React.StrictMode>
       <Content />
     </React.StrictMode>

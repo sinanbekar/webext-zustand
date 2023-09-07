@@ -21,15 +21,17 @@ const Content = () => {
 storeReadyPromise.then(() => {
   const style = document.createElement("style");
   style.textContent = `
-  :host { 
-    all: initial 
+  :host {
+    all: initial
   }
   `;
 
   document.head.replaceWith(style);
   document.body.replaceWith(document.createElement("body"));
+  const root = document.createElement("div");
+  document.body.prepend(root);
 
-  createRoot(document.body).render(
+  createRoot(root).render(
     <React.StrictMode>
       <Content />
     </React.StrictMode>
