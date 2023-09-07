@@ -4,7 +4,7 @@ import {
 } from "@eduardoac-skimlinks/webext-redux";
 import type { StoreApi } from "zustand";
 
-export const wrapStore = <T>(store: StoreApi<T>) => {
+export const wrapStore = async <T>(store: StoreApi<T>) => {
   const serializer = (payload: unknown) => JSON.stringify(payload);
   const deserializer = (payload: string) => JSON.parse(payload);
 
@@ -14,8 +14,10 @@ export const wrapStore = <T>(store: StoreApi<T>) => {
       serializer,
       deserializer,
     });
+
+    return;
   } else {
-    handlePages(store, {
+    return handlePages(store, {
       serializer,
       deserializer,
     });
@@ -40,34 +42,34 @@ const handleBackground = <T>(
   });
 };
 
-const handlePages = <T>(
+const handlePages = async <T>(
   store: StoreApi<T>,
   _configuration?: ReduxConfiguration
 ) => {
   const { serializer, deserializer, ...configuration } = _configuration || {};
   const proxyStore = new Store(configuration);
 
-  proxyStore.ready().then(() => {
-    // initial
+  await proxyStore.ready();
+
+  // initial
+  store.setState(proxyStore.getState());
+
+  const callback = (state: T) => {
+    state = deserializer?.(serializer?.(state)) ?? state;
+
+    // to prevent infinite loop, setting state directly
+    //@ts-ignore
+    proxyStore.state = state;
+    proxyStore.dispatch({ type: DISPATCH_TYPE, payload: state });
+  };
+
+  let unsubscribe = store.subscribe(callback);
+
+  proxyStore.subscribe(() => {
+    // prevent retrigger
+    unsubscribe();
     store.setState(proxyStore.getState());
-
-    const callback = (state: T) => {
-      state = deserializer?.(serializer?.(state)) ?? state;
-
-      // to prevent infinite loop, setting state directly
-      //@ts-ignore
-      proxyStore.state = state;
-      proxyStore.dispatch({ type: DISPATCH_TYPE, payload: state });
-    };
-
-    let unsubscribe = store.subscribe(callback);
-
-    proxyStore.subscribe(() => {
-      // prevent retrigger
-      unsubscribe();
-      store.setState(proxyStore.getState());
-      unsubscribe = store.subscribe(callback);
-    });
+    unsubscribe = store.subscribe(callback);
   });
 };
 

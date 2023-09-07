@@ -12,7 +12,8 @@ npm install webext-zustand
 
 - Create a store based on https://github.com/pmndrs/zustand.
 - You can create a store either reactive way or vanilla.
-- Wrap the store with `wrapStore`.
+- Wrap the store with `wrapStore`. Import the store from the background.
+- You should await for the store to connect to the background.
 
 That's it! Now your store is available from everywhere.
 
@@ -33,42 +34,89 @@ export const useBearStore = create<BearState>()((set) => ({
   increase: (by) => set((state) => ({ bears: state.bears + by })),
 }))
 
-wrapStore(useBearStore);
+export const storeReadyPromise = wrapStore(useBearStore);
 
 export default useBearStore;
-```
-
-`popup.tsx`
-
-```js
-import { useBearStore } from "../store";
-
-const Popup = () => {
-  const bears = useBearStore((state) => state.bears);
-
-  return (
-    <div>
-      <span>Bears: {bears}</span>
-    </div>
-  );
-};
 ```
 
 `background.ts`
 
 ```js
-import store from "../store";
+import store from "./store";
 
 // listen state changes
 store.subscribe((state) => {
-  console.log(state);
+  // console.log(state);
 });
 
 // dispatch
-store.getState().increase(2);
+// store.getState().increase(2);
 ```
 
-You can access the store from `content_script` too.
+`popup.tsx`
+
+```js
+import React from "react";
+import { createRoot } from "react-dom/client";
+
+import { useBearStore, storeReadyPromise } from "./store";
+
+const Popup = () => {
+  const bears = useBearStore((state) => state.bears);
+  const increase = useBearStore((state) => state.increase);
+
+  return (
+    <div>
+      Popup
+      <div>
+        <span>Bears: {bears}</span>
+        <br />
+        <button onClick={() => increase(1)}>Increment +</button>
+      </div>
+    </div>
+  );
+};
+
+storeReadyPromise.then(() => {
+  createRoot(document.getElementById("root") as HTMLElement).render(
+    <React.StrictMode>
+      <Popup />
+    </React.StrictMode>
+  );
+});
+```
+
+`content-script.tsx`
+
+```js
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { useBearStore, storeReadyPromise } from "./store";
+
+const Content = () => {
+  const bears = useBearStore((state) => state.bears);
+  const increase = useBearStore((state) => state.increase);
+
+  return (
+    <div>
+      Content
+      <div>
+        <span>Bears: {bears}</span>
+        <br />
+        <button onClick={() => increase(1)}>Increment +</button>
+      </div>
+    </div>
+  );
+};
+
+storeReadyPromise.then(() => {
+  createRoot(document.body).render(
+    <React.StrictMode>
+      <Content />
+    </React.StrictMode>
+  );
+});
+```
 
 ## Architecture
 
