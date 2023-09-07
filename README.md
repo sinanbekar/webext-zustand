@@ -2,8 +2,6 @@
 
 Use zustand to share state between pages and background in web extensions.
 
-> **Warning** This package is early in development. Do NOT use in production environment.
-
 ## 🚀 Quick Start
 
 ```bash
