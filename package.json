@@ -1,6 +1,6 @@
 {
   "name": "webext-zustand",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Use zustand to share state between pages and background in web extensions.",
   "license": "MIT",
   "author": "Sinan Bekar <sinanbekar.work@gmail.com> (https://sinan.engineer)",
