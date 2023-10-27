@@ -51,7 +51,6 @@ const handleBackground = <T>(
 
           // Expecting the alias to return a state update or undefined
           if (aliasResponse) {
-            store.setState(aliasResponse);
             return { payload: aliasResponse };
           }
         } else {
