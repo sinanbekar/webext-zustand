@@ -12,5 +12,6 @@
     "noEmit": true,
     "outDir": "dist",
     "resolveJsonModule": true,
+    "typeRoots": ["./types", "./node_modules/@types"]
   }
 }

@@ -4,30 +4,18 @@ import {
 } from "@eduardoac-skimlinks/webext-redux";
 import type { StoreApi } from "zustand";
 
-declare module "zustand" {
-  interface StoreApi<T> {
-    runInBackground?: typeof Store.prototype.dispatch;
-  }
-}
-
-export const wrapStore = async <T>(
-  store: StoreApi<T>,
-  aliases?: Record<string, Function>
-) => {
+export const wrapStore = async <T>(store: StoreApi<T>) => {
   const portName = PORTNAME_PREFIX + getStoreId(store);
   const serializer = (payload: unknown) => JSON.stringify(payload);
   const deserializer = (payload: string) => JSON.parse(payload);
 
   if (isBackground()) {
-    handleBackground(
-      store,
-      {
-        portName,
-        serializer,
-        deserializer,
-      },
-      aliases
-    );
+    handleBackground(store, {
+      portName,
+      serializer,
+      deserializer,
+    });
+
     return;
   } else {
     return handlePages(store, {
@@ -40,30 +28,17 @@ export const wrapStore = async <T>(
 
 const handleBackground = <T>(
   store: StoreApi<T>,
-  configuration: BackgroundConfiguration,
-  aliases?: Record<string, Function>
+  configuration?: BackgroundConfiguration
 ) => {
   reduxWrapStore(
     {
       getState: store.getState,
       subscribe: store.subscribe,
       //@ts-ignore
-      dispatch(data: { _sender: chrome.runtime.MessageSender; action: any }) {
-        const { action } = data;
+      dispatch(data: { _sender: chrome.runtime.MessageSender; state: T }) {
+        store.setState(data.state);
 
-        // If there's an alias for the action, execute the alias function
-        if (aliases && aliases[action.type]) {
-          const aliasResponse = aliases[action.type](action, store);
-
-          // Expecting the alias to return a state update or undefined
-          if (aliasResponse) {
-            return { payload: aliasResponse };
-          }
-        } else {
-          // Directly merge the action as state if there's no alias
-          store.setState(action);
-          return { payload: action };
-        }
+        return { payload: data.state };
       },
     },
     configuration
@@ -108,11 +83,6 @@ const handlePages = async <T>(
     // resub
     unsubscribe = store.subscribe(callback);
   });
-
-  // Augment the Zustand store with the dispatch method from the proxyStore
-  store.runInBackground = proxyStore.dispatch;
-
-  return store;
 };
 
 const isBackground = () => {
