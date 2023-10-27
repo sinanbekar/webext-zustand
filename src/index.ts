@@ -45,28 +45,24 @@ const handleBackground = <T>(
       dispatch(data: { _sender: chrome.runtime.MessageSender; action: any }) {
         const { action } = data;
 
+        // If there's an alias for the action, execute the alias function
         if (aliases && aliases[action.type]) {
-          handleZustandAction(action, store, aliases);
+          const aliasResponse = aliases[action.type](action, store);
+
+          // Expecting the alias to return a state update or undefined
+          if (aliasResponse) {
+            store.setState(aliasResponse);
+            return { payload: aliasResponse };
+          }
         } else {
+          // Directly merge the action as state if there's no alias
           store.setState(action);
+          return { payload: action };
         }
       },
     },
     configuration
   );
-};
-
-const handleZustandAction = <T>(
-  action: any,
-  store: StoreApi<T>,
-  aliases: Record<string, Function>
-) => {
-  const aliasFn = aliases[action.type];
-  if (aliasFn) {
-    aliasFn(action, store);
-  } else {
-    store.setState(action);
-  }
 };
 
 const handlePages = async <T>(
