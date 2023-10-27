@@ -4,18 +4,24 @@ import {
 } from "@eduardoac-skimlinks/webext-redux";
 import type { StoreApi } from "zustand";
 
-export const wrapStore = async <T>(store: StoreApi<T>) => {
+export const wrapStore = async <T>(
+  store: StoreApi<T>,
+  aliases?: Record<string, Function>
+) => {
   const portName = PORTNAME_PREFIX + getStoreId(store);
   const serializer = (payload: unknown) => JSON.stringify(payload);
   const deserializer = (payload: string) => JSON.parse(payload);
 
   if (isBackground()) {
-    handleBackground(store, {
-      portName,
-      serializer,
-      deserializer,
-    });
-
+    handleBackground(
+      store,
+      {
+        portName,
+        serializer,
+        deserializer,
+      },
+      aliases
+    );
     return;
   } else {
     return handlePages(store, {
@@ -28,21 +34,39 @@ export const wrapStore = async <T>(store: StoreApi<T>) => {
 
 const handleBackground = <T>(
   store: StoreApi<T>,
-  configuration?: BackgroundConfiguration
+  configuration: BackgroundConfiguration,
+  aliases?: Record<string, Function>
 ) => {
   reduxWrapStore(
     {
       getState: store.getState,
       subscribe: store.subscribe,
       //@ts-ignore
-      dispatch(data: { _sender: chrome.runtime.MessageSender; state: T }) {
-        store.setState(data.state);
+      dispatch(data: { _sender: chrome.runtime.MessageSender; action: any }) {
+        const { action } = data;
 
-        return { payload: data.state };
+        if (aliases && aliases[action.type]) {
+          handleZustandAction(action, store, aliases);
+        } else {
+          store.setState(action);
+        }
       },
     },
     configuration
   );
+};
+
+const handleZustandAction = <T>(
+  action: any,
+  store: StoreApi<T>,
+  aliases: Record<string, Function>
+) => {
+  const aliasFn = aliases[action.type];
+  if (aliasFn) {
+    aliasFn(action, store);
+  } else {
+    store.setState(action);
+  }
 };
 
 const handlePages = async <T>(
