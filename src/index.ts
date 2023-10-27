@@ -4,6 +4,12 @@ import {
 } from "@eduardoac-skimlinks/webext-redux";
 import type { StoreApi } from "zustand";
 
+declare module "zustand" {
+  interface StoreApi<T> {
+    runInBackground?: typeof Store.prototype.dispatch;
+  }
+}
+
 export const wrapStore = async <T>(
   store: StoreApi<T>,
   aliases?: Record<string, Function>
@@ -102,6 +108,11 @@ const handlePages = async <T>(
     // resub
     unsubscribe = store.subscribe(callback);
   });
+
+  // Augment the Zustand store with the dispatch method from the proxyStore
+  store.runInBackground = proxyStore.dispatch;
+
+  return store;
 };
 
 const isBackground = () => {
