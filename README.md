@@ -121,6 +121,66 @@ storeReadyPromise.then(() => {
 });
 ```
 
+## 🛠 Usage with Aliases
+
+Aliases offer a way to execute specific actions exclusively in the background script. They provide a mechanism to ensure that certain logic runs only in the background, especially handy for situations where certain browser APIs are only accessible in the background context.
+
+### Setting up Aliases
+
+In the context of our bear example, let's say you have a special action that should only be executed in the background. For instance, every time bears are incremented by a specific number, you want to send a browser notification.
+
+First, define the aliases in your store setup.
+
+`store.ts`:
+
+```js
+const aliases = {
+  "special-increment-alias": (store, { by }) => {
+    // For demonstration, let's send a browser notification when this alias is triggered.
+    browser.notifications.create({
+      type: "basic",
+      iconUrl: "icon.png",
+      title: "Special Increment!",
+      message: `The bears were specially incremented by ${by}!`,
+    });
+
+    store.getState().increase(by);
+  },
+};
+
+export const storeReadyPromise = wrapStore(useBearStore, aliases);
+
+export default useBearStore;
+```
+
+### Using Aliases in UI Components
+
+In your UI components (like popup.tsx and content-script.tsx), you can then dispatch this special action:
+
+`popup.tsx`:
+
+```js
+import React from "react";
+// ... other imports ...
+
+const Popup = () => {
+  // ... other states ...
+
+  const specialIncrement = () => {
+    useBearStore.setState({ type: "special-increment-alias", by: 5 });
+  };
+
+  return (
+    <div>
+      Popup
+      <div>
+        <button onClick={specialIncrement}>Special Increment</button>
+      </div>
+    </div>
+  );
+};
+```
+
 ## Architecture
 
 Current implementation is based on the
